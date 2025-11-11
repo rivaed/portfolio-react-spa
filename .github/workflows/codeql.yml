@@ -1,47 +1,73 @@
-name: "CodeQL"
+name: "CodeQL e Snyk"
 
 on:
-  # Roda em pushes para a branch 'main'
   push:
     branches: [ "main" ]
-  # Roda em Pull Requests para a branch 'main'
   pull_request:
     branches: [ "main" ]
-  # Roda também uma vez por semana (opcional)
   schedule:
-    - cron: '30 13 * * 4' # Quinta-feira às 13:30 UTC
+    - cron: '30 13 * * 4'
 
 jobs:
+  # TRABALHO 1: CODEQL (SAST)
+  # Este job é exatamente o que você já tinha
   analyze:
-    name: Analyze
-    # Última versão do Ubuntu
+    name: CodeQL Analysis
     runs-on: ubuntu-latest
-
-    # Permissões necessárias para o CodeQL
     permissions:
       actions: read
       contents: read
       security-events: write
-
     strategy:
       fail-fast: false
       matrix:
         language: [ 'javascript' ] 
-
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-
-    # Inicializa o CodeQL
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
-
-    # Roda o autobuild (que detecta seu build npm)
     - name: Autobuild
       uses: github/codeql-action/autobuild@v3
-
-    # Roda a análise do CodeQL
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
+
+  # TRABALHO 2: SNYK (SCA)
+  # Este é o novo job que estamos adicionando
+  snyk-scan:
+    name: Snyk SCA Scan
+    # Precisa rodar depois do 'analyze' (opcional, mas bom)
+    needs: analyze
+    runs-on: ubuntu-latest
+    
+    # Permissões para ler o código
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # Instala o Node.js para que o npm possa rodar
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Usa uma versão recente do Node
+
+      # Instala as dependências do projeto (necessário para o Snyk)
+      - name: Install dependencies
+        run: npm install
+
+      # Roda o Snyk Scan
+      - name: Run Snyk
+        # Usa a Action oficial do Snyk
+        uses: snyk/actions/node@master
+        # Passa a chave de API que você configurou nos Secrets
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          # O comando 'test' varre as dependências
+          command: test
+          args: --all-projects
